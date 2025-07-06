@@ -300,13 +300,14 @@ namespace ollama
                     
                     if (type==message_type::generation && json_data.contains("response")) simple_string=json_data["response"].get<std::string>(); 
                     else
-                    if (type==message_type::embedding && json_data.contains("embeddings")) simple_string=json_data["embeddings"].get<std::string>();
+                    // This endpoint we hit for embeddings always returns embeddings in array form in the event of batch requests.
+                    if (type==message_type::embedding && json_data.contains("embeddings")) simple_string = json_data["embeddings"].dump();
                     else
                     if (type==message_type::chat && json_data.contains("message")) simple_string=json_data["message"]["content"].get<std::string>();
                                          
                     if ( json_data.contains("error") ) error_string =json_data["error"].get<std::string>();
                 }
-                catch(...) { if (ollama::use_exceptions) throw ollama::invalid_json_exception("Unable to parse JSON string:"+this->json_string); valid = false; }
+                catch(...) { if (ollama::use_exceptions) throw ollama::invalid_json_exception("Unable to parse JSON string:"+this->json_string) ; valid = false; }
             }
             
             response() {json_string = ""; valid = false;}
@@ -826,9 +827,7 @@ class Ollama
         if (auto res = cli->Post("/api/embed", request_string, "application/json"))
         {
             if (ollama::log_replies) std::cout << res->body << std::endl;
-
-
-            if (res->status==httplib::StatusCode::OK_200) {response = ollama::response(res->body); return response; };
+            if (res->status==httplib::StatusCode::OK_200) {response = ollama::response(res->body, ollama::message_type::embedding); return response; };
             if (res->status==httplib::StatusCode::NotFound_404) { if (ollama::use_exceptions) throw ollama::exception("Model not found when trying to push (Code 404)."); }
 
             if ( response.has_error() ) { if (ollama::use_exceptions) throw ollama::exception( "Error returned from ollama when generating embeddings: "+response.get_error() ); }          
